@@ -2,47 +2,107 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Internal Admin Portal - Access Restricted</title>
+    <title>Morphic-IPS Admin Portal</title>
     <style>
-        body { font-family: Arial, sans-serif; background-color: #1a1a1a; color: #fff; text-align: center; padding-top: 100px; }
-        .login-box { border: 1px solid #333; padding: 40px; display: inline-block; background: #222; border-radius: 8px; }
-        input[type="text"], input[type="password"] { display: block; margin: 15px auto; padding: 10px; width: 200px; }
-        button { padding: 10px 20px; background: #bf212f; border: none; color: white; cursor: pointer; border-radius: 4px; }
+        body { background-color: #0b0f19; color: #cbd5e1; font-family: 'Courier New', monospace; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .card { background-color: #111827; border: 1px solid #1f2937; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        input[type="password"] { background-color: #1f2937; border: 1px solid #374151; color: #fff; padding: 10px; width: 70%; font-family: monospace; }
+        button { background-color: #059669; border: none; color: white; padding: 10px 20px; cursor: pointer; font-weight: bold; }
+        button:hover { background-color: #047857; }
+        .log-entry { padding: 8px; border-bottom: 1px solid #1f2937; line-height: 1.5; }
+        #auth-gate { text-align: center; margin-top: 100px; }
     </style>
 </head>
 <body>
-    <div class="login-box">
-        <h2>Secure Login Required</h2>
-        <p style="color: #ff4d4d; font-size: 12px;">This node is actively monitored. Unauthorized access is prohibited.</p>
-        <input type="text" placeholder="Username" disabled>
-        <input type="password" placeholder="Password" disabled>
-        <button disabled>Sign In</button>
+    <div class="container">
+        <!-- Secure Access Authentication Gate -->
+        <div id="auth-gate" class="card">
+            <h2>🔒 Morphic-IPS Security Gate</h2>
+            <p>Administrative authentication token required to fetch threat logs.</p>
+            <input type="password" id="admin-password" placeholder="Enter Admin Password...">
+            <button onclick="attemptLogin()">Decrypt</button>
+            <p id="login-error" style="color: #ef4444; margin-top: 10px;"></p>
+        </div>
+
+        <!-- Dashboard Control Framework Display Area -->
+        <div id="dashboard-view" style="display: none;">
+            <div class="card" style="display: flex; justify-content: space-between; align-items: center;">
+                <h2>🛡️ Morphic-IPS Central Console Base</h2>
+                <button onclick="purgeSystemLogs()" style="background-color: #dc2626;">Purge Stream</button>
+            </div>
+            <div class="card">
+                <h3>Captured Threat Intelligence Log Window</h3>
+                <div id="log-display" style="max-height: 400px; overflow-y: auto;">
+                    <p style="color: #64748b;">Awaiting active telemetry stream signatures...</p>
+                </div>
+            </div>
+        </div>
     </div>
+
     <script>
-        function fireForensics() {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            ctx.textBaseline = "top";
-            ctx.font = "14px 'Arial'";
-            ctx.fillStyle = "#f60";
-            ctx.fillRect(125,1,62,20);
-            ctx.fillStyle = "#069";
-            ctx.fillText("IDS_Trap_v1", 2, 15);
-            ctx.fillStyle = "rgba(102, 204, 0, 0.7)";
-            ctx.fillText("IDS_Trap_v1", 4, 17);
-            const dataURL = canvas.toDataURL();
-            let hash = 0;
-            for (let i = 0; i < dataURL.length; i++) {
-                hash = (hash << 5) - hash + dataURL.charCodeAt(i);
-                hash |= 0;
+        async function attemptLogin() {
+            const passwordField = document.getElementById('admin-password').value;
+            const errorElement = document.getElementById('login-error');
+
+            try {
+                const response = await fetch('processor.php?action=login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: passwordField })
+                });
+                
+                const result = await response.json();
+                if (response.ok && result.status === 'success') {
+                    document.getElementById('auth-gate').style.display = 'none';
+                    document.getElementById('dashboard-view').style.display = 'block';
+                    // Initialize the live polling sequence loops immediately
+                    fetchMorphicLogs();
+                    setInterval(fetchMorphicLogs, 3000);
+                } else {
+                    errorElement.innerText = result.message || "Authentication rejected.";
+                }
+            } catch (err) {
+                errorElement.innerText = "Connection backend communication failure.";
             }
-            fetch('processor.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ canvas_hash: Math.abs(hash).toString(16) })
-            });
         }
-        window.onload = fireForensics;
+
+        async function fetchMorphicLogs() {
+            try {
+                const response = await fetch('processor.php?action=get_logs');
+                if (response.status === 403) {
+                    // Force session rollback if credentials expire
+                    location.reload();
+                    return;
+                }
+                const logs = await response.json();
+                let displayArea = document.getElementById('log-display');
+                
+                if (logs.length === 0) {
+                    displayArea.innerHTML = '<p style="color: #64748b;">No security alerts recorded inside active framework window.</p>';
+                    return;
+                }
+
+                displayArea.innerHTML = '';
+                logs.reverse().forEach(event => {
+                    displayArea.innerHTML += `
+                        <div class="log-entry">
+                            <span style="color: #64748b;">[${event.timestamp}]</span> 
+                            <span style="color: #f43f5e; font-weight: bold;">${event.policy}</span> | 
+                            Source IP: <code>${event.source_ip}</code> - ${event.details}
+                        </div>`;
+                });
+            } catch (error) {
+                console.error("Polled transaction breakdown:", error);
+            }
+        }
+
+        async function purgeSystemLogs() {
+            if (confirm("Confirm structural flush of active logs?")) {
+                await fetch('processor.php?action=purge_logs');
+                fetchMorphicLogs();
+            }
+        }
     </script>
 </body>
 </html>
