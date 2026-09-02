@@ -1,0 +1,8 @@
+[
+    {
+        "timestamp": "2026-09-02 01:27:38",
+        "policy": "PORT SHIFTING / TARPIT",
+        "source_ip": "192.168.1.42",
+        "details": "Aggressive TCP port scanning detected. Session locked down into slow-feed tarpit socket."
+    }
+]
