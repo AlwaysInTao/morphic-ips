@@ -1,0 +1,16 @@
+# Python virtual environments
+venv/
+test_env/
+
+# Python compiled caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Operating system metadata
+.DS_Store
+Thumbs.db
+
+# Engine runtime locks or temporary files
+/tmp/ids_trigger.json
